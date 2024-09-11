@@ -121,6 +121,10 @@ def succes_downdloaded(title: str):
     except OSError as e:
         error(f"Error deleting file: {mp3_file} - {e}")
         return HTTPException(status_code=500, detail="Error al eliminar el archivo")
+    
+@app.get('/')
+def home():
+    return {"message": "Welcome to the Youtube Downloader API"}
 
 
 if __name__ == "__main__":
