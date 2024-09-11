@@ -20,6 +20,7 @@ app.add_middleware(
     allow_headers=["*"],  
 )
 
+port = int(os.environ.get("PORT", 8000))
 download_dir = os.path.join(os.path.dirname(__file__), 'downloads')
 os.makedirs(download_dir, exist_ok=True)
 
@@ -124,4 +125,4 @@ def succes_downdloaded(title: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=port)
