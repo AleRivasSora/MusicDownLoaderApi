@@ -1,6 +1,6 @@
 import os
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 import yt_dlp
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,18 +9,17 @@ from mutagen.mp3 import MP3
 from mutagen.id3 import ID3
 from mutagen import File 
 
-# Crear la aplicación FastAPI
+
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permitir todas las solicitudes de origen
+    allow_origins=["*"],  
     allow_credentials=True,
-    allow_methods=["*"],  # Permitir todos los métodos HTTP
-    allow_headers=["*"],  # Permitir todos los encabezados
+    allow_methods=["*"],  
+    allow_headers=["*"],  
 )
 
-# Establecer la ruta de descargas dentro del proyecto
 download_dir = os.path.join(os.path.dirname(__file__), 'downloads')
 os.makedirs(download_dir, exist_ok=True)
 
@@ -36,10 +35,6 @@ def clear():
         os.system('cls')
     else:
         os.system('clear')
-
-def print_proceso_terminado():
-    print('Descarga completada')
-    print('-------------------------------------------------------')
 
 def start_download(link):
     ydl_opts = {
@@ -62,32 +57,52 @@ def start_download(link):
             print('-------------------------------------------------------')
             print(f'Título: {title}')
             print(f'Autor: {author}')
+            print(f'Álbum: {album}')
             print('')
-            title = info_dict.get('title', None)
-            artist = info_dict.get('uploader', None)
-            album = info_dict.get('album', None)  # Intenta obtener el álbum si está disponible
             mp3_file = os.path.join(download_dir, f"{info_dict['title']}.mp3")
             print('mp3 file data')
 
-            mp3_file = os.path.join(download_dir, f"{info_dict['title']}.mp3")
 
-            return mp3_file
+
+            return {
+                "mp3_file": mp3_file,
+                "metadata": {
+                    "title": title,
+                    "author": author,
+                    "album": album
+                }}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error en el link: {link} - {e}')
+    
 
 @app.post("/download_audio/")
 def download_audio(request: DownloadRequest):
-    mp3_file = start_download(request.url)
-    # if not os.path.exists(mp3_file):
-    #     raise HTTPException(status_code=404, detail="File not found")
+    result = start_download(request.url)
+    mp3_file = result["mp3_file"]
+    metadata = result["metadata"]
+
+    return JSONResponse(content={
+        "message": "Descarga completada",
+        "title": metadata["title"],
+        "author": metadata["author"],
+        "album": metadata["album"],
+        "file_url": f"/download_file/{os.path.basename(mp3_file)}"
+    })
+
+
+@app.get("/download_file/{filename}")
+def download_file(filename: str):
+    file_path = os.path.join(download_dir, filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
 
     def iterfile():
-        with open(mp3_file, mode="rb") as file_like:
+        with open(file_path, mode="rb") as file_like:
             yield from file_like
 
-    response = StreamingResponse(iterfile(), media_type="audio/mpeg", headers={"Content-Disposition": f"attachment; filename={os.path.basename(mp3_file)}"})
+    return StreamingResponse(iterfile(), media_type="audio/mpeg", headers={"Content-Disposition": f"attachment; filename={filename}"})
 
-    return response
 
 @app.get("/donwload_ok/")
 def succes_downdloaded(title: str):
@@ -106,7 +121,7 @@ def succes_downdloaded(title: str):
         error(f"Error deleting file: {mp3_file} - {e}")
         return HTTPException(status_code=500, detail="Error al eliminar el archivo")
 
-# Ejemplo de uso
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
